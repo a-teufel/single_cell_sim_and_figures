@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582578667804.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "D4BD2ED7",
+    "lastKnownWriteTime" : 1582591546,
+    "last_content_update" : 1582591546839,
+    "path" : "~/Single_cell/spire/R/trueABC.R",
+    "project_path" : "R/trueABC.R",
+    "properties" : {
+        "cursorPosition" : "121,51",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 10,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

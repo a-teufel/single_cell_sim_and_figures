@@ -8,27 +8,44 @@ require(reshape2)
 
 #read in data
 filenames <-
-  list.files(path = "C:/Users/User/Documents/Polio_data_104/events",
+  list.files(path = "data/104/track_events_104/",
              pattern = "events*",
              full.names = TRUE)
 
 RNA_P <- NULL
 RNA_N <- NULL
 GFP <- NULL
-
+P <-NULL
 for (i in filenames) {
   name <- paste(i)
   temp <- read.csv(name, sep = ",")
   #all times need to be divided by 2, to get to half hour mark
+
+  #print(min(temp$RNA_N))
   #get the min value, because we want to know when the event first happened
-  RNA_P <- c(RNA_P, min(which(temp$RNA_P != 0)) / 2)
-  RNA_N <- c(RNA_N, min(which(temp$RNA_N != 0)) / 2)
-  GFP <- c(GFP, min(which(temp$GFP != 0)) / 2)
+  if( max(temp$t) <= 18){ # & max(temp$RNA_N)>0){
+    P <-c(P, (min(which(temp$packaged !=0))/2)-.5)
+    RNA_P <- c(RNA_P, (min(which(temp$RNA_P != 0)) / 2)-.5)
+    RNA_N <- c(RNA_N, (min(which(temp$RNA_N != 0)) / 2)-.5)
+    GFP <- c(GFP, (min(which(temp$GFP != 0)) / 2)-.5)
+  }
 }
+
+
+
+
+P <- P[which(is.finite(P))]
+print(median(P))
 
 RNA_P <- RNA_P[which(is.finite(RNA_P))]
 RNA_N <- RNA_N[which(is.finite(RNA_N))]
 protein <- GFP[which(is.finite(GFP))]
+
+print(RNA_P)
+print(median(RNA_P))
+
+print(RNA_N)
+print(median(RNA_N))
 
 #everything gray because i just did this for the no drug case
 cbPalette <- c("#999999", "#999999", "#999999", "#999999")
@@ -83,7 +100,7 @@ pp <- plot_grid(
 pp <- pp + theme(plot.margin = unit(c(.2, .2, .2, .2), "cm"))
 
 ggplot2::ggsave(
-  "timing2.pdf",
+  "timing.pdf",
   plot = pp,
   width = 12,
   height = 12,

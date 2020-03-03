@@ -1,4 +1,4 @@
-#draws estimates of parameter values from final rounds of abc for the no drug case. Figure 3
+#draws estimates of parameter values from final rounds of abc for the no drug case. Figure 4
 
 rm(list = ls())
 library(ggplot2)
@@ -14,11 +14,11 @@ df <- NULL
 
 #read in data
 d_104 = read.table(
-  "C:/Users/User/Documents/Polio_data_104/estimation_iterations/Final_ABC_save_parameters_labs_new3.txt",
+  "data/104/Final_ABC_save_parameters.txt",
   header = TRUE
 )
 
-
+#natural bounds (can change this to starting bounds)
 lower <- apply(d_104[1:10], 2, min)
 upper <- apply(d_104[1:10], 2, max)
 
@@ -186,7 +186,7 @@ pp <- plot_grid(
 
 
 ggplot2::ggsave(
-  "C:/Users/User/Documents/Polio_data_104/just104_range.pdf",
+  "just104_range.pdf",
   plot = pp,
   width = 12,
   height = 12,

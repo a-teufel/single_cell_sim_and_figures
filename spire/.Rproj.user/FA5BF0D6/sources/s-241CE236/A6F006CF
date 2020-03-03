@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582579848229.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "A6F006CF",
+    "lastKnownWriteTime" : 1583257531,
+    "last_content_update" : 1583257531,
+    "path" : "~/Single_cell/spire/man/trackmutants_ABC.Rd",
+    "project_path" : "man/trackmutants_ABC.Rd",
+    "properties" : {
+        "cursorPosition" : "0,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 12,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_doc"
+}

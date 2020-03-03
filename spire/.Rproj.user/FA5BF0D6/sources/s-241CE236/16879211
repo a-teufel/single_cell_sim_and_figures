@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582577754889.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "71|25|266|4|\n",
+    "hash" : "0",
+    "id" : "16879211",
+    "lastKnownWriteTime" : 1582578414,
+    "last_content_update" : 1582578414779,
+    "path" : "~/aspire/aspire/R/first_round_ABC.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "57,29",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

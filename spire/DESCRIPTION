@@ -1,0 +1,21 @@
+Package: spire
+Type: Package
+Title: spire: Single-cell Population Infection Replication Estimation
+Version: 0.1
+Date: 2016-02-24
+Author: Ashley Teufel
+Maintainer: Ashley Teufel <ateufel@utexas.edu>
+Description: Aims to estimate parameters of a model from high throughput single cell virology experiments. This program makes use of a model described in: 
+    Schulte,  M.  B.,  Draghi,  J.  A.,  Plotkin,  J.  B.,  and  Andino,  R.  (2015).   Experimentally guided models reveal replication principles that shape the mutation distribution of RNA viruses.eLife, 4:e03753. 
+    This model is fit to data described in:
+    Liu, W., Caglar, M. U., Mao, Z., Woodman, A., Arnold, J. J., Wilke, C. O., and Cameron,C. E. (2019). More than efficacy revealed by single-cell analysis of antiviral therapeutics.Science Advances, 5:eaax4761
+    The code in this sudo-package (sudo because it will not be release on CRAN) was developed for a manuscript that is currently being drafted.  
+    The parameter space of this model is fairly large, so to speed convergence a GA is first applied (first_round_GA.R), then an ABC is run for many iterations (trueABC.R). 
+    This project was developed on a unix based platform and makes use parallelization methods which do not work on a windows platform. 
+License: GPL-2 | GPL-3
+LazyData: TRUE
+Imports:
+    Rcpp (>= 0.12.2)
+LinkingTo: Rcpp
+RoxygenNote: 7.0.2
+

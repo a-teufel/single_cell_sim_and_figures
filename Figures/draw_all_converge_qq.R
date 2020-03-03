@@ -1,4 +1,4 @@
-#draw QQ plot comparing each of the fitted distributions (Fig. S12)
+#draw QQ plot comparing each of the fitted distributions (Fig. S2)
 
 rm(list = ls())
 library(ggplot2)
@@ -13,81 +13,50 @@ max_est <- NULL
 lysis_est <- NULL
 score_est <- NULL
 
-get_data <- function(exp, i) {
+get_data <- function(exp) {
   slope_est <- NULL
   mid_est <- NULL
   max_est <- NULL
   lysis_est <- NULL
   score_est <- NULL
-  
+
   name <-
     paste(
-      "C:/Users/User/Documents/Polio_data_104/estimation_iterations/",
-      exp,
-      "_Up2/Final_ABC_Slope_new",
-      i,
-      ".txt",
+      "data/",exp,"/Final_ABC_B11.txt",
       sep = ""
     )
   temp <- scan(name)
   data <- data.frame(d = as.vector(temp))
   slope_est <- rbind(slope_est, data)
-  
-  
+
+
   name <-
     paste(
-      "C:/Users/User/Documents/Polio_data_104/estimation_iterations/",
-      exp,
-      "_Up2/Final_ABC_Mid_new",
-      i,
-      ".txt",
+      "data/",exp,"/Final_ABC_M11.txt",
       sep = ""
     )
   temp <- scan(name)
   data <- data.frame(d = as.vector(temp))
   mid_est <- rbind(mid_est, data)
-  
+
   name <-
     paste(
-      "C:/Users/User/Documents/Polio_data_104/estimation_iterations/",
-      exp,
-      "_Up2/Final_ABC_Max_new",
-      i,
-      ".txt",
+      "data/",exp,"/Final_ABC_Ka.txt",
       sep = ""
     )
   temp <- scan(name)
   data <- data.frame(d = as.vector(temp))
   max_est <- rbind(max_est, data)
-  
+
   name <-
     paste(
-      "C:/Users/User/Documents/Polio_data_104/estimation_iterations/",
-      exp,
-      "_Up2/Final_ABC_lysis_new",
-      i,
-      ".txt",
+      "data/",exp,"/Final_ABC_lysis.txt",
       sep = ""
     )
   temp <- scan(name)
   data <- data.frame(d = as.vector(temp))
   lysis_est <- rbind(lysis_est, data)
-  
-  name <-
-    paste(
-      "C:/Users/User/Documents/Polio_data_104/estimation_iterations/",
-      exp,
-      "_Up2/Final_ABC_max_score_new",
-      i,
-      ".txt",
-      sep = ""
-    )
-  temp <- scan(name)
-  data <- data.frame(d = as.vector(temp))
-  print(mean(as.vector(temp)))
-  score_est <- rbind(score_est, data)
-  
-  
+
   d <-
     data.frame(
       slope = slope_est,
@@ -101,16 +70,16 @@ get_data <- function(exp, i) {
 
 get_csv_data <- function(drug) {
   RDA_file <-
-    read.csv("C:/Users/User/Documents/Polio_data_104/all.csv", header = TRUE)
-  
+    read.csv("data/all.csv", header = TRUE)
+
   RDA_data <- RDA_file
-  
-  
+
+
   #record the rows where mod 10 fit best
   rows_where_5_fit_best <- NULL
   rows_where_10_fit_best <- NULL
   rows_where_line_fit_best <- NULL
-  
+
   #get just the lines with data
   for (i in 1:length(RDA_data[, 1])) {
     if (RDA_data[i, ]$decision_bio == "infection&lysis" &
@@ -122,12 +91,12 @@ get_csv_data <- function(drug) {
       rows_where_5_fit_best <- c(rows_where_5_fit_best, i)
     }
   }
-  
-  
+
+
   RDA_data_just_5_mod <- RDA_data[rows_where_5_fit_best, ]
-  
+
   RDA_data_just_10_mod <- RDA_data[rows_where_10_fit_best, ]
-  
+
   max <-
     c(RDA_data_just_5_mod$COMB_maximum_y,
       RDA_data_just_10_mod$COMB_maximum_y)
@@ -140,13 +109,13 @@ get_csv_data <- function(drug) {
   lysis <-
     c(rep(24, nrow(RDA_data_just_5_mod)),
       RDA_data_just_10_mod$COMB_startDeclinePoint_x)
-  
+
   d <- data.frame(slope, midpoint, max, lysis)
-  
+
   colnames(d) <- c("Slope", "Midpoint", "Maximum", "Lysis")
   return(d)
-  
-  
+
+
 }
 
 #do QQ
@@ -164,10 +133,10 @@ refine <- function(x, y) {
 }
 
 #read estimted data
-exp_104 <- get_data(104, 3)
-exp_105 <- get_data(105, 3)
-exp_106 <- get_data(106, 2)
-exp_107 <- get_data(107, 3)
+exp_104 <- get_data(104)
+exp_105 <- get_data(105)
+exp_106 <- get_data(106)
+exp_107 <- get_data(107)
 
 #read experimental data
 obs_104 <- get_csv_data("no drug")
@@ -179,9 +148,9 @@ obs_107 <- get_csv_data("2 μM Ganetespib")
 make_plot <- function(exp, obs, color, label) {
   d <- refine(exp, obs)
   reg <- lm(obs ~ exp, data = d)
-  
+
   m <- (ks.test(obs, exp))
-  
+
   #do Ks test
   lm_eqn <- function(df) {
     m <- (ks.test(df$obs, df$exp))
@@ -189,12 +158,12 @@ make_plot <- function(exp, obs, color, label) {
     eq <- substitute("  p =" ~ r2,
                      list(r2 = format(m$p, digits = 3)))
     as.character(as.expression(eq))
-    
+
   }
-  
+
   xl <- paste("est.\n", label)
   yl <- paste("obs.\n", label)
-  
+
   darkPalette <-
     c(
       "#999999",
@@ -206,7 +175,7 @@ make_plot <- function(exp, obs, color, label) {
       "#D55E00",
       "#CC79A7"
     )
-  
+
   g <-
     ggplot(data = d, aes(x = obs, y = exp)) + geom_point(colour = darkPalette[color]) + xlab(xl) + ylab(yl) +
     xlim(c(min(d), max(d))) + ylim(c(min(d), max(d))) +
@@ -226,7 +195,7 @@ make_plot <- function(exp, obs, color, label) {
       parse = TRUE
     )
   return(g)
-  
+
 }
 
 
@@ -237,8 +206,8 @@ all_exp <- function(exp, obs, color, label, letters) {
   g2 <- make_plot(exp$Maximum, obs$Maximum, color, "maximum")
   g3 <- make_plot(exp$Midpoint, obs$Midpoint, color, "midpoint")
   g4 <- make_plot(exp$Lysis, obs$Lysis, color, "lysis")
-  
-  
+
+
   pp <- plot_grid(
     g1,
     g2,
@@ -249,16 +218,16 @@ all_exp <- function(exp, obs, color, label, letters) {
     nrow = 1,
     labels = letters
   )
-  
+
   p <- plot_grid(pp, nrow = 1)
-  
+
   title <- ggdraw() + draw_label(label, fontface = 'bold')
   plot_grid(title, p, ncol = 1, rel_heights = c(0.2, 1)) # rel_heights values control title margins
-  
+
   No_drug <- plot_grid(title, p, ncol = 1, rel_heights = c(0.2, 1))
-  
+
   return(No_drug)
-  
+
 }
 
 letters1 <- c("A", "B", "C", "D")
@@ -281,7 +250,7 @@ pp <- plot_grid(
 )
 
 ggplot2::ggsave(
-  "C:/Users/User/Documents/Polio_data_104/all_qq_ks.pdf",
+  "all_qq_ks.pdf",
   plot = pp,
   width = 12,
   height = 12,

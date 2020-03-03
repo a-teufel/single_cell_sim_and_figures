@@ -1,4 +1,4 @@
-#draws correlations between parameters for a given data set (Fig 5,S3, S6, & S9)
+#draws correlations between parameters for a given data set (S3, S6, S7, & S8)
 
 rm(list = ls())
 library(ggplot2)
@@ -12,7 +12,7 @@ hcl_palettes(plot = TRUE)
 df <- NULL
 
 d_104 = read.table(
-  "C:/Users/User/Documents/Polio_data_104/estimation_iterations/104_Up2/Final_ABC_save_parameters_labs_new3.txt",
+  "data/104/Final_ABC_save_parameters.txt",
   header = TRUE
 )
 
@@ -118,7 +118,7 @@ p <-
   )
 
 ggplot2::ggsave(
-  "C:/Users/User/Documents/Polio_data_104/cor104_labs_small2.pdf",
+  "cor104_labs_small2.pdf",
   plot = p,
   width = 7,
   height = 7,

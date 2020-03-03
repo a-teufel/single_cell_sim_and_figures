@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582577041791.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "22E520EF",
+    "lastKnownWriteTime" : 1582578426,
+    "last_content_update" : 1582578426,
+    "path" : "~/Single_cell/spire/man/first_round_GA.Rd",
+    "project_path" : "man/first_round_GA.Rd",
+    "properties" : {
+        "cursorPosition" : "0,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_doc"
+}

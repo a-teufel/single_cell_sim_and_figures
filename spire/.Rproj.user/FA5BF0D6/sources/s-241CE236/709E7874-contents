@@ -1,0 +1,405 @@
+#' Title
+#'
+#' @param max max values from sigmoidal fit of infection data
+#' @param slope slope values from sigmoidal fit of infection data
+#' @param midpoint midpoint values from sigmoidal fit of infection data
+#' @param MOI MOI that experiments were run at
+#' @param n_iterations number of time to run the ABC with parameters
+#' @param n_replicates number of times to replicate the ABC with a parameter set
+#' @param n_cores number of cores to be used in parallel in replicate ABC runs
+#' @param accept_crit acceptance criteria (.05)
+#'
+#' @return Function returns parameter values accepted from ABC simulation and the max,slope, and midpoint values
+#' @export
+#'
+#' @examples
+
+#min_time = 3
+#max_time=24
+
+#enableJIT(3)
+
+
+trueABC <- function(first_round_ABC_parameters,max, slope, midpoint, lysis,  MOI, n_saves, n_replicates, n_cores, accept_crit, min_time, max_time, precent_error,write){
+  #register how many cores are to be used when calling replicates
+  registerDoMC(n_cores)
+  #cl <- makeCluster(n_cores,type="SOCK")
+  #registerDoSNOW(cl)
+
+
+  #upper an lower bounds for ABC
+
+  #low<-c(-2, -10, -10,  -10,     -10,   -10,  2,   2,  1,  0, 0, 0,0,0,0,0,0,0,0,0,0,0)
+  #high<-c( 6, 0,    1.5,   20,   20,    0,   20,   15,  10, 1, .0001,1,1,1,1,1,1,1,1,1,1,1)
+
+  #org andino bounds
+
+  #low<-c(-5.9,-13,   -10.4, -6.8,-0.25,-10,      4.1,  11,  1,  0,  0, 0,0,0,0,0,0,0,0,0,0,0)
+  #high<-c(0.5, -5.1,   0.5,  0,   2.5, -0.8,   8,    17.5, 10,  0.95,.0001,1,1,1,1,1,1,1,1,1,1,1)
+
+  low<-c(-5.9,-13,-10.4,-10,-0.25,-10,4.1,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0)
+  high<-c(0.5,0,.5,0,2.5,0,10,17.5,10,0.95,1,1,1,1,1,1,1,1,1,1,1,1)
+
+
+  min_time<-1
+  max_time<-50
+
+  min_shift<-0
+  max_shift<-10
+
+  min_var_time<-0
+  max_var_time<-5
+
+  min_var_shift<-0
+  max_var_shift<-20
+
+
+   low<-c(low,min_time,min_shift,min_var_time,min_var_shift)
+  high<-c(high,max_time,max_shift,max_var_time,max_var_shift)
+
+
+          max_ka<-max(max)+max(max)*precent_error
+	  min_ka<-min(max)-min(max)*precent_error
+
+	  max_b1<-max(slope)+max(slope)*precent_error
+	  min_b1<-min(slope)-min(slope)*precent_error
+
+	  max_m1<-max(midpoint)+max(midpoint)*precent_error
+	  min_m1<-min(midpoint)-min(midpoint)*precent_error
+
+	  #find out what the max lys time is that is under 24 hours.
+	  cp_lysis<-lysis
+	  cp_lysis[cp_lysis == 24 ]<-0
+	  cut_off_lysis<-max(cp_lysis)
+
+	  #print("cut off")
+	  print(cut_off_lysis)
+
+	  #max_ly<-max(lysis)+max(lysis)*precent_error
+	  max_ly<-24
+	  min_ly<-min(lysis)-min(lysis)*precent_error
+
+  savedParameters<-first_round_ABC_parameters
+  savedParameters_var<-NULL
+  savedJitteredParameters<-NULL
+  savedParameters2<-NULL
+  savedVar<-NULL
+
+  #interal variance to use
+  sigma_prime<-sig(first_round_ABC_parameters)
+  #print(sigma_prime)
+
+
+  #parameters for sigmoidal
+  est_maxa<-NULL
+  est_slope1<-NULL
+  est_midpoint1<-NULL
+  est_lys<-NULL
+
+  #parameters for linear
+  est_max_d<-NULL
+  est_best<-NULL
+
+  n_saved<-0
+  i<-0
+#start first round of abc
+  #for(i in 1:n_iterations){
+  while(n_saved < n_saves){
+      print("cut off is ")
+      print(accept_crit)
+      i<-i+1
+      print(" first_round iteration")
+      print(i)
+      print("numbers saved")
+      print(n_saved)
+      inputs <-nrow(savedParameters)
+      print(inputs)
+      rand<-runif(26, 1, inputs)
+      #rand<-runif(1,1,inputs)
+      #param_list_var<-savedParameters[rand,]
+
+      #create a parameter vector to send to the abc
+      param_list_var<-c(savedParameters[rand[1],1],savedParameters[rand[2],2],savedParameters[rand[3],3],savedParameters[rand[4],4],savedParameters[rand[5],5],savedParameters[rand[6],6],savedParameters[rand[7],7],savedParameters[rand[8],8],
+      savedParameters[rand[9],9],savedParameters[rand[10],10],savedParameters[rand[11],11],savedParameters[rand[12],12],savedParameters[rand[13],13],savedParameters[rand[14],14],savedParameters[rand[15],15],savedParameters[rand[16],16],savedParameters[rand[17],17],savedParameters[rand[18],18],
+      savedParameters[rand[19],19],savedParameters[rand[20],20],savedParameters[rand[21],21],savedParameters[rand[22],22],savedParameters[rand[23],23],savedParameters[rand[24],24],savedParameters[rand[25],25],savedParameters[rand[26],26])
+      #print("before mod")
+      #print(param_list_var)
+
+      #add some variance to the parameters
+       param_temp_var<-param_list_var
+
+       for(k in 1:length(param_list_var)){
+	        try_newparam<-rnorm(1,mean=param_list_var[k],sd=sigma_prime[k])
+
+	     while(try_newparam > high[k] || try_newparam < low[k]){
+
+		     try_newparam<-rnorm(1,mean=param_list_var[k],sd=sigma_prime[k])
+	       }
+
+	       param_temp_var[k]<-try_newparam
+	       }
+
+	#print("temp list")
+	#print(param_temp_var)
+	#choose new parameter from preterbed list.
+
+
+    Res2<- foreach(j=1:n_replicates) %dopar%{
+      #print("new j")
+      #print(j)
+
+	  param_temp<-c(0, 0, 0,  0,     0,   0,  0,   0,  0,  0, 0)
+	  for(k in 1:11){
+	      try_newparam<-rnorm(1,mean=param_temp_var[k],sd=param_temp_var[k+11])
+	      #print(try_newparam)
+		while(try_newparam > high[k] || try_newparam < low[k]){
+		  try_newparam<-rnorm(1,mean=param_temp_var[k],sd=param_temp_var[k+11])
+		}
+		param_temp[k]<-try_newparam
+	    }
+	  #print("made it here1")
+	  #print("trying")
+	    #print(param_temp)
+	  ly_time<-rgamma(1,shape=param_temp_var[23],rate=param_temp_var[25])
+	  while ( ly_time <  min_ly-3){ #minus 3 because obs dont start till after 3 hours
+	    #ly_time<-rnorm(1,mean=param_list[23],sd=param_list[25])
+	    ly_time<-rgamma(1,shape=param_temp_var[23],rate=param_temp_var[25])
+	  }
+
+
+	     lysis_time<-round( ly_time/.5, digits = 0)*.5
+
+
+	    st_time<-rnorm(1,mean=param_temp_var[24],sd=param_temp_var[26])
+
+	    while(st_time < 0 || st_time > max_time ){
+	      st_time<-rnorm(1,mean=param_temp_var[24],sd=param_temp_var[26])
+	    }
+
+      if(st_time >= lysis_time){
+        st_time<-0
+      }
+
+	    start_time<-round(st_time/.5, digits = 0)*.5
+
+
+	   # print(start_time)
+	   # print(lysis_time)
+	   # print(start_time+lysis_time)
+
+	    if(start_time+lysis_time > cut_off_lysis){
+              start_time <- 1
+	      st_time <- 1
+	      lysis_time <-24 - start_time
+	      ly_time<-24-st_time
+	    }
+
+            
+	    #print("made it here2")
+	    #print(lysis_time)
+
+	     #ABC_data<-tryCatch(timeOut(param_temp,MOI,sim_min_time, sim_max_time, elapsed=1), Error = function(e) NA_real_)
+	     time=seq(start_time,start_time+lysis_time,0.5)
+	     #print(time)
+
+	     if(length(time) > (min_ly*2)-(3*2) && start_time+lysis_time <=  max_ly && start_time+lysis_time > min_ly){
+
+        #print("made it here3")
+
+	    sim_min_time<-0
+	    sim_max_time<-lysis_time
+
+
+	    ABC_data<-NULL
+	  
+	    ABC_data<-avepa(param_temp,MOI,sim_min_time, sim_max_time,write)
+	   # print("rand sim")
+	    #print(ABC_data)
+	    #print(length(ABC_data))
+	   
+
+	           best_model<-NULL
+            parameterVector_sig<-NULL
+            parameterVector_line<-NULL
+	    param_temp<-c(param_temp,ly_time,start_time)
+      #print("made assign")
+
+          if(length(unique(ABC_data))!=1){
+	          #print('valid')
+            #v_name <-paste("event_valid__it_",i,"rep_",j,"_n_save",n_saved,".txt")
+            #file.rename("events.txt", v_name)
+	   dataInput=data.frame(intensity=ABC_data,time=time)
+	   dataOutput = normalizeData(dataInput)
+	   dataInput2=dataOutput
+	   #print("normalized data")
+
+	    #parameterVector_line=multiplefitFunction(dataInput=dataInput2,model="linear",n_runs_min=20,n_runs_max=100)
+	   #print("maximum_Estimate ")
+	   #print(max_ka)
+	   #print(min_ka)
+	   #print("Slope")
+	   #print(max_b1)
+	   #print(min_b1)
+	   #print("Mid")
+	   #print(max_m1)
+	   #print(min_m1)
+
+	    parameterVector_sig=multipleFitFunction(dataInput=dataInput2,model="sigmoidal",n_runs_min=20,n_runs_max=100)
+      #print("ran fit")
+	   # print( parameterVector_sig)
+      
+            if( parameterVector_sig$isThisaFit &  parameterVector_sig$maximum_Estimate < max_ka & parameterVector_sig$maximum_Estimate
+                > min_ka & parameterVector_sig$slopeParam_Estimate < max_b1 & parameterVector_sig$slopeParam_Estimate > min_b1 &
+                parameterVector_sig$midPoint_Estimate < max_m1 & parameterVector_sig$midPoint_Estimate > min_m1){
+			#print("gonna cash")
+	    }
+	    if( parameterVector_sig$isThisaFit &  parameterVector_sig$maximum_Estimate < max_ka & parameterVector_sig$maximum_Estimate
+	        > min_ka & parameterVector_sig$slopeParam_Estimate < max_b1 & parameterVector_sig$slopeParam_Estimate > min_b1 &
+	        parameterVector_sig$midPoint_Estimate < max_m1 & parameterVector_sig$midPoint_Estimate > min_m1){
+
+	      list(parameterVector_sig$maximum_Estimate,parameterVector_sig$slopeParam_Estimate,parameterVector_sig$midPoint_Estimate, best_model,param_temp,st_time+ly_time)
+
+	    }
+		#else{
+		#list(rep(NULL,6))
+		#}
+
+		#}
+		}
+	
+
+	    #print("ran fits")
+
+	}	    #if linear is the best
+	      #if( parameterVector_line$AIC_value < parameterVector_sig$AIC_value |  parameterVector_sig$maximum_Estimate > max_ka | parameterVector_sig$maximum_Estimate < min_ka | parameterVector_sig$slope_Estimate > max_b1
+	#	| parameterVector_sig$slope_Estimate < min_b1 | parameterVector_sig$midPoint_Estimate > max_m1 | parameterVector_sig$midPoint_Estimate < min_m1){
+	#	best_model<-1
+	#	parameterVector_sig<-NULL
+	#	ly_time<-NULL
+	#	start_time<-NULL
+	#	}
+	 #     else{
+	#	best_model<-0
+	#	parameterVector_line<-NULL
+	 #     }
+
+	 #   }
+	  #  else{
+	   #   best_model<-1
+	    #  ly_time<-NULL
+	    # start_time<-NULL
+	    #if there is no chance of execpting the draw because the parameters are outside of the bounds dont bother with the rest of the rest
+	    #maxa_temp<-parameterVector$maximum_Estimate
+	    #slope1_temp<-parameterVector$slope_Estimate
+	    #midpoint1_temp<-parameterVector$midPoint_Estimate
+	    #}
+	    #}
+	    #else{
+	    #best_model<-NULL
+            #parameterVector_sig<-NULL
+            #parameterVector_line<-NULL
+	    #param_temp<-NULL
+	    #start_time<-NULL
+	    #ly_time<-NULL
+	    #}
+	    #print("listing")
+	    #list(parameterVector_sig$maximum_Estimate,parameterVector_sig$slope_Estimate,parameterVector_sig$midPoint_Estimate, best_model,param_temp,start_time+ly_time)
+	  #}
+
+     }#end RES
+      print("finished par")
+     #make sure that all of the estimated parameters are with in sane bounds and that each of the replicates ran correctly
+      #print(Res2)
+      #print(length(Res2))
+
+      #get the results into a usuable from the parallel call
+      maxa_dist <- do.call(cbind, lapply(Res2, "[[", 1))
+      #print("max")
+      slope1_dist <- do.call(cbind, lapply(Res2, "[[", 2))
+      #print("slope")
+      midpoint1_dist <- do.call(cbind, lapply(Res2, "[[", 3))
+      #print("mid")
+
+      best_dist <- do.call(cbind, lapply(Res2, "[[", 4))
+      #print("best")
+      jitter_parameters<-do.call(rbind,lapply(Res2, "[[",5))
+
+      ly_dist<-do.call(cbind,lapply(Res2, "[[",6))
+
+      print("assigned everything")
+      print(maxa_dist)
+      print("1")
+      print(slope1_dist)
+      print("2")
+      print(midpoint1_dist)
+      print("3")
+      print(ly_dist)
+
+
+      if(length(maxa_dist)!=0){
+      #print("in if")
+
+      max_ks<-ks.test(maxa_dist, max,exact=FALSE)
+
+      slope_ks<-ks.test(slope1_dist, slope,exact=FALSE)
+
+      midpoint_ks<-ks.test(midpoint1_dist, midpoint,exact=FALSE)
+
+      ly_ks<-ks.test(ly_dist, lysis,exact=FALSE)
+
+          max_d <-sum(max_ks$statistic,slope_ks$statistic,midpoint_ks$statistic,ly_ks$statistic) #+ (sum(best_dist)/n_replicates)
+
+	  print("score:")
+	  print(max_d)
+	  if(max_d <= accept_crit ){
+
+	    parm<-cbind(param_temp_var)
+	 
+	    savedParameters2<-rbind(savedParameters2,parm)
+
+	    jittered_parameters<-cbind(jitter_parameters)
+	    savedJitteredParameters<-rbind(savedJitteredParameters,jitter_parameters)
+	    est_maxa<-cbind(est_maxa,maxa_dist)
+	    est_slope1<-cbind(est_slope1,slope1_dist)
+	    est_midpoint1<-cbind(est_midpoint1,midpoint1_dist)
+	    est_best<-cbind(est_best,best_dist)
+	    est_lys<-cbind(est_lys,ly_dist)
+
+             print("saved parmaa")
+	     print(parm)
+	    #est_maxa_d<-cbind(est_maxa_d,max_ks$statistic)
+	    #est_slope1_d<-cbind(est_slope1_d,slope_ks$statistic)
+	    #est_midpoint1_d<-cbind(est_midpoint1_d,midpoint_ks$statistic)
+	    #est_lys_d<-cbind(est_lys_d,ly_ks$statistic)
+
+	    est_max_d<-cbind(est_max_d,max_d)
+	    n_saved<-n_saved+1
+	    }
+
+      }
+  }#end first round of ABC
+  #stopCluster(cl)
+  trueabc<-NULL
+  trueabc$est_ABC_parameters<-savedParameters2
+  trueabc$est_maxa<-est_maxa
+  trueabc$est_slope1<-est_slope1
+  trueabc$est_midpoint1<-est_midpoint1
+  trueabc$est_best<-est_best
+  trueabc$est_lys<-est_lys
+  trueabc$est_max_d<-est_max_d
+  trueabc$est_jitter_ABC_parameters<-savedJitteredParameters
+
+  print(trueabc)
+  print(trueabc$est_ABC_parameters)
+
+  return(trueabc)
+  }
+
+
+
+#enableJIT(3)
+
+#trueABC_comp<-cmpfun(trueABC)
+
+
+

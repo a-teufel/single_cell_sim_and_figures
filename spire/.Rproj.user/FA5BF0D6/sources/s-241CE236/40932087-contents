@@ -1,0 +1,290 @@
+
+library(dplyr)
+library(Rcpp)
+library(foreach)
+library(fBasics)
+library(doMC)
+library(sicegar)
+library(ggplot2)
+library(spire)
+library(cowplot)
+library(DEoptim)
+library(doSNOW)
+library(R.utils)
+library(compiler)
+library(doParallel)
+
+
+
+args<-commandArgs(TRUE)
+
+setCompilerOptions(suppressAll = TRUE, optimize = 3)
+enableJIT(3)
+
+name<-args[1]
+
+RDA_file<-read.csv("C:/Users/aiteu/Documents/Single_cell/all.csv",header=TRUE)
+
+RDA_data<-RDA_file
+#head(RDA_data)
+
+#get all the AIC values to figure out which one is the lowest, we only want to use data in which the fit to mod 10 worked best
+#mod10_AIC<-RDA_data$mod10_filter00_AIC_value
+#dif_AIC<-RDA_data$dif_filter00_AIC_value
+#mod5_AIC<-RDA_data$mod05_filter00_AIC_value
+#linear_AIC<-RDA_data$linear_filter00_AIC_value
+
+#infect<-RDA_data$cluster01
+
+#0 for linear, 1 for sig
+best_model<-NULL
+
+#record the rows where mod 10 fit best
+rows_where_5_fit_best<-NULL
+rows_where_10_fit_best<-NULL
+rows_where_line_fit_best<-NULL
+
+#print(RDA_data)
+#print(length(RDA_data[,1]))
+
+
+
+#get just the lines with data
+for( i in 1:length(RDA_data[,1])){
+
+  if(RDA_data[i,]$decision_bio == "infection&lysis" & RDA_data[i,]$dataSet_bio== "no drug"  ){
+    rows_where_10_fit_best<-c(rows_where_10_fit_best,i)
+    }
+  if(RDA_data[i,]$decision_bio == "infection" & RDA_data[i,]$dataSet_bio== "no drug"  ){
+    rows_where_5_fit_best<-c(rows_where_5_fit_best,i)
+    }
+}
+
+print(rows_where_5_fit_best)
+
+
+print(length(rows_where_5_fit_best))
+
+
+RDA_data_just_5_mod<-RDA_data[rows_where_5_fit_best,]
+
+
+RDA_data_just_10_mod<-RDA_data[rows_where_10_fit_best,]
+
+
+
+
+max<-c(RDA_data_just_5_mod$COMB_maximum_y,RDA_data_just_10_mod$COMB_maximum_y)
+slope<-c(RDA_data_just_5_mod$COMB_slope1,RDA_data_just_10_mod$COMB_slope1)
+midpoint<-c(RDA_data_just_5_mod$COMB_midPoint1_x,RDA_data_just_10_mod$COMB_midPoint1_x)
+lysis<-c(rep(24, length(rows_where_5_fit_best)),RDA_data_just_10_mod$COMB_startDeclinePoint_x)
+
+#RDA_data_just_10_mod<-RDA_data[rows_where_10_fit_best,]
+
+
+#pick out the parameters that we are going to use
+#max<-c(RDA_data_just_10_mod$COMB_maximum_y)
+#slope<-c(RDA_data_just_10_mod$COMB_slope1)
+#midpoint<-c(RDA_data_just_10_mod$COMB_midPoint1_x)
+#lysis<-c(RDA_data_just_10_mod$COMB_startDeclinePoint_x)
+
+
+df1<-data.frame(x=as.vector(max))
+df2<-data.frame(x=as.vector(slope))
+df3<-data.frame(x=as.vector(midpoint))
+df4<-data.frame(x=as.vector(lysis))
+
+
+print(df4)
+#fdfds
+
+time=seq(3,24,0.5)
+#print(df1[1,])
+#print(length(df1[,1]))
+
+#pdf("startingcurves.pdf")
+
+#for( i in 1:length(df1[,1])){
+
+#lysis_time<-round( df4[i,], digits = 0)
+#time=seq(3,lysis_time,0.5)
+
+#intensity=sigmoidalFitFormula(time, maximum=df1[i,], slope=df2[i,], midPoint=df3[i,])
+#print(intensity)
+#dataInput=data.frame(intensity=intensity,time=time)
+#normalizedInput = normalizeData(dataInput,dataInputName="batch_01_21_2016_samp007623")
+
+#sigmoidalModel=fitFunction(dataInput=normalizedInput,
+#                                    model="sigmoidal",
+#                                    n_runs_min=20,
+#                                  n_runs_max=100,
+#                                  showDetails=FALSE)
+
+#fig02=printInfectionCurves(dataInput=normalizedInput,
+#                        sigmoidalFitVector=sigmoidalModel)
+#print(fig02)
+
+
+#}
+#dev.off()
+names = c("Max", "Slope","Mid","Lysis")
+
+#print(df1)
+
+  p1<-ggplot(df1,aes(x)) + geom_density(position='dodge')  +xlab(names[1])
+
+  p2<-ggplot(df2,aes(x)) + geom_density(position='dodge')  +xlab(names[2])
+
+  p3<-ggplot(df3,aes(x)) + geom_density(position='dodge') +xlab(names[3])
+
+  p4<-ggplot(df4,aes(x)) + geom_density(position='dodge') +xlab(names[4])
+
+  int<-plot_grid(p1,p2,p3,p4)
+
+  save_plot("match_numerical_no_long.pdf",int)
+
+
+
+MOI<-.45
+n_iterations<-2
+n_replicates<-2
+min_time<-3
+max_time<-24
+pop_size<-5
+n_cores<-1
+
+
+n_saves<-10
+precent_error<-1
+initialpop<-NULL
+cutoff<- 0
+#temp<-first_round_GA(max,slope,midpoint,lysis,MOI,pop_size,n_iterations,n_replicates,min_time,max_time,initialpop,n_cores,precent_error,0)
+
+#print(temp)
+
+#fdafd
+
+#print(temp)
+
+
+#print(temp$optim$bestmem)temp<-first_round_ABC(Ka,B1,M1,best_m,MOI,pop_size,n_iterations,n_replicates,min_time,max_time,initialpop,n_cores,precent_error)
+#print(temp$optim$bestval)
+#print(temp$member$pop)
+
+#write(t(temp$member$pop),file="testvar_1rep.txt",ncol=26)
+#initialpop<-temp$member$pop
+#fdafda
+#estgen<-paste("estgen_ga.txt" ,sep="")
+#write(track,file=estgen)
+
+  # mean_d<-temp$optim$bestval+(temp$optim$bestval)*precent_error
+   mean_d <- 10
+
+
+ # dat<-read.table(file="testvar_1rep.txt")
+  dat <- read.table(file="C:/Users/aiteu/Documents/Single_cell/Run_104_sfi/gf1rpFinal_ABC_save_parameters_new29.txt")
+
+  fc<-cmpfun(trueABC)
+  #print(as.matrix(dat))
+
+  get_parms<-trueABC(as.matrix(dat),max, slope, midpoint, lysis,  MOI, n_saves, n_replicates, n_cores, mean_d, precent_error,0)
+
+  track<-trackmutants_ABC(as.matrix(dat),MOI,n_replicates,n_cores,min_time,max_time)
+
+  i<-29
+  estgen<-paste("Est_gen_ABC",i,".txt" ,sep="")
+  write(track,file=estgen)
+
+   fdafdsaf
+
+  #print("read table")
+
+  lag<-mean(dat$V24)
+  print(lag)
+
+  print("mean d")
+  print(mean_d)
+
+  #i<-25
+  while (mean_d > cutoff){
+
+  enableJIT(3)
+  fc<-cmpfun(trueABC)
+  #print(as.matrix(dat))
+  get_parms<-fc(as.matrix(dat),max,slope,midpoint,lysis,MOI,n_saves, n_replicates, n_cores, mean_d, min_time, max_time, precent_error,1)
+  #get_parms<-trueABC_no_lag(as.matrix(dat),max,slope,midpoint,lysis,MOI,n_saves, n_replicates, n_cores, mean_d, min_time, max_time, precent_error,lag)
+
+  #print(get_parms)
+
+  nameka<-paste("gf1rpFinal_ABC_Ka_new",i,".txt" ,sep="")
+  write(get_parms$est_maxa,file=nameka)
+  print("1")
+
+  nameb<-paste("gf1rpFinal_ABC_B11_new",i,".txt" ,sep="")
+  write(get_parms$est_slope1,file=nameb)
+    print("2")
+  namem<-paste("gf1rpFinal_ABC_M11_new",i,".txt" ,sep="")
+  write(get_parms$est_midpoint1,file=namem)
+    print("3")
+  namebest<-paste("gf1rpFinal_ABC_best_new",i,".txt" ,sep="")
+  write(get_parms$est_best,file=namebest)
+    print("4")
+  namelysis<-paste("gf1rpFinal_ABC_lysis_new",i,".txt" ,sep="")
+  write(get_parms$est_lys,file=namelysis)
+    print("5")
+  namemax<-paste("gf1rpFinal_ABC_max_new",i,".txt" ,sep="")
+  write(get_parms$est_max_d,file=namemax)
+    print("6")
+
+
+
+  namejitter<-paste("gf1rpFinal_ABC_jitter_new",i,".txt" ,sep="")
+  write(get_parms$est_jitter_ABC_parameters,file=namejitter,ncol=13)
+    print("7")
+
+  nameparms<-paste("gf1rpFinal_ABC_save_parameters_new",i,".txt" ,sep="")
+  print(get_parms$est_ABC_parameters)
+  #write(get_parms$est_ABC_parameters,file=nameparms,ncol=26)
+  write(get_parms$est_ABC_parameters,file=nameparms,ncol=26)
+
+  df1<-data.frame(x=as.vector(get_parms$est_maxa))
+  df2<-data.frame(x=as.vector(get_parms$est_slope1))
+  df3<-data.frame(x=as.vector(get_parms$est_midpoint1))
+  df4<-data.frame(x=as.vector(get_parms$est_lys))
+
+
+  names = c("Max", "Slope","Mid","Lysis")
+
+  p1<-ggplot(df1,aes(x)) + geom_density(position='dodge')  +xlab(names[1])
+
+  p2<-ggplot(df2,aes(x)) + geom_density(position='dodge')  +xlab(names[2])
+
+  p3<-ggplot(df3,aes(x)) + geom_density(position='dodge') +xlab(names[3])
+
+  p4<-ggplot(df4,aes(x)) + geom_density(position='dodge') +xlab(names[4])
+
+  int<-plot_grid(p1,p2,p3,p4)
+
+  plotname<-paste("gf1rpFinal_est",i,".pdf" ,sep="")
+
+  save_plot(plotname,int)
+
+
+
+  if( get_parms$est_max_d < mean_d){
+    print("GETTING BETTER")
+    mean_d<-mean(get_parms$est_max_d)
+    dat<-read.table(file=nameparms)
+    }
+
+    #track<-trackmutants_ABC(as.matrix(dat),MOI,n_replicates,n_cores,min_time,max_time)
+
+
+    #estgen<-paste("Est_gen_ABC",i,".txt" ,sep="")
+    #write(track,file=estgen)
+
+  i<-i+1
+  #write(t(temp$member$pop),file=name,ncol=26)
+
+
+  }

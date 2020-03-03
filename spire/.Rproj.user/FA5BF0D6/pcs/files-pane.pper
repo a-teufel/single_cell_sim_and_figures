@@ -1,0 +1,9 @@
+{
+    "path" : "~/Single_cell/spire",
+    "sortOrder" : [
+        {
+            "ascending" : true,
+            "columnIndex" : 2
+        }
+    ]
+}

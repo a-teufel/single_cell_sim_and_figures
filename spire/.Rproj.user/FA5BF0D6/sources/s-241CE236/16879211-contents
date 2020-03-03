@@ -1,0 +1,778 @@
+#' Title
+#'
+#' @param max max values from sigmoidal fit of infection data
+#' @param slope slope values from sigmoidal fit of infection data
+#' @param midpoint midpoint values from sigmoidal fit of infection data
+#' @param MOI MOI that experiments were run at
+#' @param n_iterations number of time to run the ABC with parameters
+#' @param n_replicates number of times to replicate the ABC with a parameter set
+#' @param n_cores number of cores to be used in parallel in replicate ABC runs
+#' @param accept_crit acceptance criteria (.05)
+#'
+#' @return Function returns parameter values accepted from ABC simulation and the max,slope, and midpoint values
+#' @export
+#'
+#' @examples
+
+#min_time = 3
+#max_time=24
+
+first_round_ABC <-
+  function(max, slope, midpoint, lysis,MOI,pop_size, n_iterations, n_replicates, min_time, max_time, initpop, n_cores,precent_error,write){
+    #register how many cores are to be used when calling replicates
+    #registerDoMC(n_cores)
+    #cl <- makeCluster(n_cores,type="FORK")
+    #registerDoSNOW(cl)
+
+
+    #setting rules no less than -15, no more than 20
+    #low<-c(-2, -10, -10,  -10,     -10,   -10,  2,   2,  1,  0, 0, 0,0,0,0,0,0,0,0,0,0,0)
+    #high<-c( 6, 0,    1.5,   20,   20,    0,   20,   15,  10, 1, .0001,1,1,1,1,1,1,1,1,1,1,1)
+
+    low<-c(-5.9,-13,   -10.4, -6.8,-0.25,-10,      4.1,  11,  1,  0,  0, 0,0,0,0,0,0,0,0,0,0,0)
+    high<-c(0.5, -5.1,   0.5,  0,   2.5, -0.8,   8,    17.5, 10,  0.95,.0001,1,1,1,1,1,1,1,1,1,1,1)
+
+    min_time<-1
+    max_time<-50
+
+    min_shift<-0
+    max_shift<-10
+
+    min_var_time<-0
+    max_var_time<-5
+
+    min_var_shift<-0
+    max_var_shift<-20
+
+
+    low<-c(low,min_time,min_shift,min_var_time,min_var_shift)
+    high<-c(high,max_time,max_shift,max_var_time,max_var_shift)
+
+    savedParameters<-NULL
+    savedParameters_var<-NULL
+    savedJitteredParameters<-NULL
+    savedParameters2<-NULL
+    savedVar<-NULL
+
+
+    #parameters for sigmoidal
+    est_max<-NULL
+    est_slope1<-NULL
+    est_midpoint1<-NULL
+
+    #parameters for linear
+    est_inter<-NULL
+    est_slope<-NULL
+    est_best<-NULL
+
+
+
+
+    #function to do fitting
+    CallSim<-function(x){
+
+      low<-c(-5.9,-13,   -10.4, -6.8,-0.25,-10,      4.1,  11,  1,  0,  0)
+      high<-c(0.5, -5.1,   0.5,  0,   2.5, -0.8,   8,    17.5, 10,  0.95,.0001)
+
+      Vect_max<-NULL
+      Vect_slope<-NULL
+      Vect_mid<-NULL
+      Vect_best<-NULL
+      Vect_ly<-NULL
+      max_ka<-max(max)+max(max)*precent_error
+      min_ka<-min(max)-min(max)*precent_error
+
+      max_b1<-max(slope)+max(slope)*precent_error
+      min_b1<-min(slope)-min(slope)*precent_error
+
+
+      max_m1<-max(midpoint)+max(midpoint)*precent_error
+      min_m1<-min(midpoint)-min(midpoint)*precent_error
+
+
+      #find out what the max lys time is that is under 24 hours.
+      cp_lysis<-lysis
+      cp_lysis[cp_lysis == 24 ]<-0
+      cut_off_lysis<-max(cp_lysis)
+
+      #print("cut off")
+      print(cut_off_lysis)
+
+      #max_ly<-max(lysis)+max(lysis)*precent_error
+      max_ly<-24
+      min_ly<-min(lysis)-min(lysis)*precent_error
+      #
+      #print("input")
+      #print(x)
+      param_list<-x
+      for(j in 1:n_replicates){
+
+        #add noise to the parameters
+        param_temp<-c(0, 0, 0,  0,     0,   0,  0,   0,  0,  0, 0)
+        for(k in 1:11){
+          try_newparam<-rnorm(1,mean=param_list[k],sd=param_list[k+11])
+          while(try_newparam > high[k] || try_newparam < low[k]){
+            try_newparam<-rnorm(1,mean=param_list[k],sd=param_list[k+11])
+          }
+          param_temp[k]<-try_newparam
+        }
+
+
+
+        print("trying")
+        print(param_temp)
+
+        #ly_time<-rnorm(1,mean=param_list[23],sd=param_list[25])
+        #ly_time<-rgamma(1,shape=param_list[23],rate=param_list[25])
+
+        #ly_time<-rnorm(1,mean=param_list[23],sd=param_list[25])
+        ly_time<-rgamma(1,shape=param_list[23],rate=param_list[25])
+        while ( ly_time <  min_ly-3){ #minus 3 because obs dont start till after 3 hours
+          #ly_time<-rnorm(1,mean=param_list[23],sd=param_list[25])
+          ly_time<-rgamma(1,shape=param_list[23],rate=param_list[25])
+        }
+
+        lysis_time<-round( ly_time/.5, digits = 0)*.5
+
+        st_time<-rnorm(1,mean=param_list[24],sd=param_list[26])
+
+        while(st_time < 0 || st_time > max_time){
+          st_time<-rnorm(1,mean=param_list[24],sd=param_list[26])
+        }
+
+
+        start_time<-round(st_time/.5, digits = 0)*.5
+
+
+        print("times")
+        print(start_time)
+        print(lysis_time)
+        print(start_time+lysis_time)
+
+        if(start_time+lysis_time > cut_off_lysis){
+          lysis_time <-24 - start_time
+          ly_time<-24-st_time
+        }
+        print(start_time)
+        print(lysis_time)
+
+        if( start_time+lysis_time >  max_ly || start_time+lysis_time < min_ly || lysis_time < start_time){
+          return(Inf)
+        }
+
+
+        #ABC_data<-tryCatch(timeOut(param_temp,MOI,sim_min_time, sim_max_time, elapsed=1), Error = function(e) NA_real_)
+        time=seq(start_time,start_time+lysis_time,0.5)
+        #print(time)
+
+        #print("the min lysis time")
+        #print(min_ly)
+        #print(min_ly*2)
+        #print((min_ly*2)-(3*2))
+
+        #min lysis time *2 - number of time points until lysis, in real data they dont start obs until hours 3, so 3*2 points out
+        if(length(time) < (min_ly*2)-(3*2)){
+          return(Inf)
+        }
+
+
+
+        sim_min_time<-0
+        sim_max_time<-lysis_time
+
+
+        ABC_data<-NULL
+        ABC_data<-avepa(param_temp,MOI,sim_min_time, sim_max_time,write)
+        #print("raw data")
+        #print(ABC_data)
+
+        # print("got data")
+        #run the sim until infection happens
+        if(length(unique(ABC_data))!=1){
+          #print("good data")
+          dataInput=data.frame(intensity=ABC_data,time=time)
+          #print(dataInput)
+          dataOutput = normalizeData(dataInput)
+          dataInput2=dataOutput
+
+
+          parameterVector_sig=multipleFitFunction(dataInput=dataInput2,model="sigmoidal",n_runs_min=20,n_runs_max=100)
+
+
+
+
+          print("maximum_Estimate ")
+          print(max_ka)
+          print(min_ka)
+          print("Slope")
+          print(max_b1)
+          print(min_b1)
+          print("Mid")
+          print(max_m1)
+          print(min_m1)
+
+
+          if( parameterVector_sig$isThisaFit &  parameterVector_sig$maximum_Estimate < max_ka & parameterVector_sig$maximum_Estimate
+              > min_ka & parameterVector_sig$slopeParam_Estimate < max_b1 & parameterVector_sig$slopeParam_Estimate > min_b1 &
+              parameterVector_sig$midPoint_Estimate < max_m1 & parameterVector_sig$midPoint_Estimate > min_m1){
+
+
+            Vect_max<-c(Vect_max,parameterVector_sig$maximum_Estimate)
+            Vect_slope<-c(Vect_slope, parameterVector_sig$slopeParam_Estimate)
+            Vect_mid<-c(Vect_mid, parameterVector_sig$midPoint_Estimate)
+            #Vect_best<-c(Vect_best,best_model)
+            Vect_ly<-c(Vect_ly,st_time+ly_time)
+          }
+
+        }
+
+        #else{
+
+        #Vect_best<-c(Vect_best,1)
+        #}
+
+      }#end replicates
+      print("vectors")
+      print(Vect_max)
+      print(Vect_slope)
+      print(Vect_mid)
+      print(Vect_ly)
+      #print("number of fails")
+      #print(sum(Vect_best))
+
+
+      if(length(Vect_max)!=0){
+
+        max_ks<-ks.test(Vect_max, max,exact=FALSE)
+
+        slope_ks<-ks.test(Vect_slope, slope,exact=FALSE)
+
+        midpoint_ks<-ks.test(Vect_mid, midpoint,exact=FALSE)
+
+        ly_ks<-ks.test(Vect_ly, lysis,exact=FALSE)
+
+        #best_ks<-ks.test(Vect_best, best_m,exact=FALSE)
+
+        #print("Test")
+        #print(max_ks)
+        #print(slope_ks)
+        #print(midpoint_ks)
+        max_d <-sum(max_ks$statistic,slope_ks$statistic,midpoint_ks$statistic*5,ly_ks$statistic*5)  #+ (sum(Vect_best)/n_replicates)
+        #print("score")
+        #print(max_d)
+
+        return(max_d)
+      }
+      return(Inf)
+    }#end function fitting
+
+
+
+    #g<-cmpfun(CallSim)
+
+
+    #print("doing try")
+    #try<-c(0.7573012, -4.555646, -2.012598, -7.009184, 0.9467612, -5.720502, 9.759888, 12.97817, 8.715462, 0.4231536, 2.268219e-06)
+
+    #CallSim(try)
+    #parallelType=1
+
+
+
+
+    parVar=c("max","slope","midpoint","lysis","n_replicates","MOI","max_time","min_time","precent_error")
+
+    ## Get ready to evaluate on all these cores
+    #cl <- makeSOCKcluster(n_cores)
+
+    ## load any necessary packages
+    #clusterEvalQ(cl, c(library(sicegar),library(aspire),library(Rcpp),library(R.utils)))
+
+    ## copy any necessary objects
+    #clusterExport(cl,   parVar)
+
+    ## register foreach backend
+    #registerDoSNOW(cl)
+
+    #print(cl)
+    #ptm<-proc.time()
+    #round1<-DEoptim(CallSim,lower=low,upper=high, control=list(NP=pop_size, initialpop=initpop, parallelType=2,strategy=6, c=.15, itermax=n_iterations, storepopfrom=1, storepopfreq=1 ,trace=TRUE))
+    #print("first tooK:")
+    #print(proc.time() - ptm)
+    #stopCluster(cl)
+
+
+    optimize_function_cmp <- cmpfun(CallSim)
+
+    #ptm<-proc.time()
+    round1<-DEoptim(CallSim,lower=low,upper=high, control=list(NP=pop_size, initialpop=initpop, parallelType=1,packages=c(library(sicegar),library(aspire),library(Rcpp),library(R.utils)),parVar=parVar,strategy=6, c=.15, itermax=n_iterations, storepopfrom=1, storepopfreq=1 ,trace=TRUE))
+
+    #did first 4 with strat 6, gonna do the new few with 2
+    #round1<-DEoptim2(CallSim,lower=low,upper=high, control=list(NP=pop_size, initialpop=initpop, parallelType=1,packages=c(library(sicegar),library(aspire),library(Rcpp),library(R.utils)),parVar=parVar,limitCores=n_cores, strategy=2, c=.15, itermax=n_iterations, storepopfrom=1, storepopfreq=1 ,trace=TRUE))
+
+
+
+    #round1<-DEoptim(CallSim,lower=low,upper=high, control=list(NP=pop_size, initialpop=initpop, parallelType=1,packages=c(library(sicegar),library(aspire),library(Rcpp),library(R.utils)),parVar=parVar, strategy=2,itermax=n_iterations, storepopfrom=1, storepopfreq=1 ,trace=TRUE))
+
+
+    #round1<-DEoptim2(CallSim,lower=low,upper=high, control=list(NP=pop_size, initialpop=initpop, parallelType=0,packages=c(library(sicegar),library(aspire),library(Rcpp),library(R.utils)),parVar=parVar, strategy=6, c=.15, itermax=n_iterations, storepopfrom=1, storepopfreq=1 ,trace=TRUE))
+    #print("second tooK:")
+    #print(proc.time() - ptm)
+    #round_1<-NULL
+    #round_1$est_ABC_parameters<-savedParameters
+    #round_1$est_ABC_parameters_var<-savedParameters_var
+    #round_1$est_maxa<-est_maxa
+    #round_1$est_slope1<-est_slope1
+    #round_1$est_midpoint1<-est_midpoint1
+    #round_1$est_inter<-est_inter
+    #round_1$est_slope<-est_slope
+    #round_1$est_best<-est_best
+    #round_1$est_jitter_ABC_parameters<-savedJitteredParameters
+    #round_1$est_var<-savedVar
+
+    #print(round_1)
+    #print(round_1$est_ABC_parameters)
+    #p<-score_pop(round1,max, slope, midpoint, lysis,MOI,pop_size, n_iterations, n_replicates, min_time, max_time,n_cores,precent_error,0)
+    return(round1)
+  }
+
+
+
+score_pop <- function(pop,max, slope, midpoint, lysis,MOI,pop_size, n_iterations, n_replicates, min_time, max_time,n_cores,precent_error,write){
+
+  registerDoMC(n_cores)
+  max_ly<-24
+  min_ly<-min(lysis)-min(lysis)*precent_error
+  #find out what the max lys time is that is under 24 hours.
+  cp_lysis<-lysis
+  cp_lysis[cp_lysis == 24 ]<-0
+  cut_off_lysis<-max(cp_lysis)
+  Vect_max<-NULL
+  Vect_slope<-NULL
+  Vect_mid<-NULL
+  Vect_best<-NULL
+  Vect_ly<-NULL
+  max_ka<-max(max)+max(max)*precent_error
+  min_ka<-min(max)-min(max)*precent_error
+
+  max_b1<-max(slope)+max(slope)*precent_error
+  min_b1<-min(slope)-min(slope)*precent_error
+
+
+  max_m1<-max(midpoint)+max(midpoint)*precent_error
+  min_m1<-min(midpoint)-min(midpoint)*precent_error
+
+
+  low<-c(-5.9,-13,   -10.4, -6.8,-0.25,-10,      4.1,  11,  1,  0,  0, 0,0,0,0,0,0,0,0,0,0,0)
+  high<-c(0.5, -5.1,   0.5,  0,   2.5, -0.8,   8,    17.5, 10,  0.95,.0001,1,1,1,1,1,1,1,1,1,1,1)
+
+
+  last_pop<-pop$member$pop
+  print("in last pop")
+  print(last_pop)
+  Pop<-NULL
+
+  for( i in 1:length(last_pop[,1])){
+
+    param_list<-last_pop[i,]
+    print(param_list)
+    max_score=0
+
+    Vect_max<-NULL
+    Vect_slope<-NULL
+    Vect_mid<-NULL
+    Vect_ly<-NULL
+
+    Res2<- foreach(j=1:n_replicates) %dopar%{
+
+      score = 0
+
+      param_temp<-c(0, 0, 0,  0,     0,   0,  0,   0,  0,  0, 0)
+      for(k in 1:11){
+        try_newparam<-rnorm(1,mean=param_list[k],sd=param_list[k+11])
+        while(try_newparam > high[k] || try_newparam < low[k]){
+          try_newparam<-rnorm(1,mean=param_list[k],sd=param_list[k+11])
+        }
+        param_temp[k]<-try_newparam
+      }
+
+
+
+      print("trying")
+      print(param_temp)
+
+      ly_time<-rgamma(1,shape=param_list[23],rate=param_list[25])
+      while ( ly_time <  min_ly-3){ #minus 3 because obs dont start till after 3 hours
+        #ly_time<-rnorm(1,mean=param_list[23],sd=param_list[25])
+        ly_time<-rgamma(1,shape=param_list[23],rate=param_list[25])
+      }
+
+      lysis_time<-round( ly_time/.5, digits = 0)*.5
+
+      st_time<-rnorm(1,mean=param_list[24],sd=param_list[26])
+
+      while(st_time < 0 || st_time > max_time){
+        st_time<-rnorm(1,mean=param_list[24],sd=param_list[26])
+      }
+
+
+      start_time<-round(st_time/.5, digits = 0)*.5
+
+
+      if(start_time+lysis_time > cut_off_lysis){
+        lysis_time <-24 - start_time
+        ly_time<-24-st_time
+      }
+      print(start_time)
+      print(lysis_time)
+
+      if( start_time+lysis_time >  max_ly || start_time+lysis_time < min_ly || lysis_time < start_time){
+        score<--Inf
+      }
+
+      if(score != -Inf){
+        #ABC_data<-tryCatch(timeOut(param_temp,MOI,sim_min_time, sim_max_time, elapsed=1), Error = function(e) NA_real_)
+        time=seq(start_time,start_time+lysis_time,0.5)
+
+        if(length(time) < (min_ly*2)-(3*2)){
+          score=-Inf
+        }
+
+        if(score != -Inf){
+          param_temp<-param_list[1:11]
+          print(param_temp)
+          sim_min_time<-0
+          sim_max_time<-lysis_time
+
+
+          ABC_data<-NULL
+          ABC_data<-avepa(param_temp,MOI,sim_min_time, sim_max_time,write)
+          print("raw data")
+          print(ABC_data)
+
+          print("got data")
+          #run the sim until infection happens
+          if(length(unique(ABC_data))!=1){
+            #print("good data")
+            dataInput=data.frame(intensity=ABC_data,time=time)
+            #print(dataInput)
+            dataOutput = normalizeData(dataInput)
+            dataInput2=dataOutput
+
+            parameterVector_sig=multipleFitFunction(dataInput=dataInput2,model="sigmoidal",n_runs_min=20,n_runs_max=100)
+
+
+            if( parameterVector_sig$isThisaFit &  parameterVector_sig$maximum_Estimate < max_ka & parameterVector_sig$maximum_Estimate
+                > min_ka & parameterVector_sig$slopeParam_Estimate < max_b1 & parameterVector_sig$slopeParam_Estimate > min_b1 &
+                parameterVector_sig$midPoint_Estimate < max_m1 & parameterVector_sig$midPoint_Estimate > min_m1){
+
+              list(parameterVector_sig$maximum_Estimate,parameterVector_sig$slopeParam_Estimate,parameterVector_sig$midPoint_Estimate, best_model,param_temp,st_time+ly_time)
+
+            }
+
+          }
+
+        }#end correct time
+
+      }# end good score
+
+    }# end par
+    print("end par")
+    maxa_dist <- do.call(cbind, lapply(Res2, "[[", 1))
+    print("max")
+    slope1_dist <- do.call(cbind, lapply(Res2, "[[", 2))
+    print("slope")
+    midpoint1_dist <- do.call(cbind, lapply(Res2, "[[", 3))
+    print("mid")
+
+    best_dist <- do.call(cbind, lapply(Res2, "[[", 4))
+    print("best")
+    jitter_parameters<-do.call(rbind,lapply(Res2, "[[",5))
+
+    ly_dist<-do.call(cbind,lapply(Res2, "[[",6))
+
+    max_score<-NA
+    if(length(maxa_dist )!=0){
+      print("storing")
+
+      max_ks<-ks.test(maxa_dist , max,exact=FALSE)
+
+      slope_ks<-ks.test(slope1_dist , slope,exact=FALSE)
+
+      midpoint_ks<-ks.test(midpoint1_dist, midpoint,exact=FALSE)
+
+      ly_ks<-ks.test(ly_dist, lysis,exact=FALSE)
+
+      max_d <-sum(max_ks$statistic,slope_ks$statistic,midpoint_ks$statistic*5,ly_ks$statistic*5)  #+ (sum(Vect_best)/n_replicates)
+
+      max_score<-max_d
+      print(max_score)
+
+      temp<-NULL
+      temp$param_list<-as.vector(param_list)
+      temp$score<-as.vector(max_score)
+      temp$max<-as.vector(maxa_dist)
+      temp$slope<-as.vector(slope1_dist)
+      temp$mid <- as.vector(midpoint1_dist)
+      temp$ly <-as.vector(ly_dist)
+      print(temp)
+      ttt<-as.data.frame(t(temp))
+      print(ttt)
+      Pop<-rbind(Pop,ttt)
+    }
+
+  }
+
+
+  print(Pop)
+
+  df<-as.data.frame(lapply(Pop$score, unlist))
+  Pop<-cbind(Pop,t(df))
+  colnames(Pop)[7]<-"sort_score"
+  Pop<-arrange(Pop, sort_score)
+  return(Pop)
+
+
+}#end function fitting
+
+
+
+# A simple modification of DEoptim (and DEoptim.control) to limit the number of cores used in the paralell mode.
+# In DEoptim.control you may set a new variable 'limitCores'.
+# When 'limitCores' is set below 1, a certain portion of available cores will be used.
+# 'limitCores' set to a number (say: 2,4,10) will make DEoptim use a specified number of cores.
+# The goal is to constrain the DEoptim CPU consumption.
+
+DEoptim2 <- function (fn, lower, upper, control = DEoptim.control(), ...,
+                      fnMap = NULL)
+{
+  if (length(lower) != length(upper))
+    stop("'lower' and 'upper' are not of same length")
+  if (!is.vector(lower))
+    lower <- as.vector(lower)
+  if (!is.vector(upper))
+    upper <- as.vector(upper)
+  if (any(lower > upper))
+    stop("'lower' > 'upper'")
+  if (any(lower == "Inf"))
+    warning("you set a component of 'lower' to 'Inf'. May imply 'NaN' results",
+            immediate. = TRUE)
+  if (any(lower == "-Inf"))
+    warning("you set a component of 'lower' to '-Inf'. May imply 'NaN' results",
+            immediate. = TRUE)
+  if (any(upper == "Inf"))
+    warning("you set a component of 'upper' to 'Inf'. May imply 'NaN' results",
+            immediate. = TRUE)
+  if (any(upper == "-Inf"))
+    warning("you set a component of 'upper' to '-Inf'. May imply 'NaN' results",
+            immediate. = TRUE)
+  if (!is.null(names(lower)))
+    nam <- names(lower)
+  else if (!is.null(names(upper)) & is.null(names(lower)))
+    nam <- names(upper)
+  else nam <- paste("par", 1:length(lower), sep = "")
+  ctrl <- do.call(DEoptim.control, as.list(control))
+  ctrl$npar <- length(lower)
+  if (is.na(ctrl$NP))
+    ctrl$NP <- 10 * length(lower)
+  if (ctrl$NP < 4) {
+    warning("'NP' < 4; set to default value 10*length(lower)\n",
+            immediate. = TRUE)
+    ctrl$NP <- 10 * length(lower)
+  }
+  if (ctrl$NP < 10 * length(lower))
+    warning("For many problems it is best to set 'NP' (in 'control') to be at least ten times the length of the parameter vector. \n",
+            immediate. = TRUE)
+  if (!is.null(ctrl$initialpop)) {
+    ctrl$specinitialpop <- TRUE
+    if (!identical(as.numeric(dim(ctrl$initialpop)), as.numeric(c(ctrl$NP,
+                                                                  ctrl$npar))))
+      stop("Initial population is not a matrix with dim. NP x length(upper).")
+  }
+  else {
+    ctrl$specinitialpop <- FALSE
+    ctrl$initialpop <- 0
+  }
+  ctrl$trace <- as.numeric(ctrl$trace)
+  ctrl$specinitialpop <- as.numeric(ctrl$specinitialpop)
+  ctrl$initialpop <- as.numeric(ctrl$initialpop)
+  if (ctrl$parallelType == 2) {
+    if (!foreach::getDoParRegistered()) {
+      foreach::registerDoSEQ()
+    }
+    args <- ctrl$foreachArgs
+    fnPop <- function(params, ...) {
+      my_chunksize <- ceiling(NROW(params)/foreach::getDoParWorkers())
+      my_iter <- iterators::iter(params, by = "row", chunksize = my_chunksize)
+      args$i <- my_iter
+      args$.combine <- c
+      if (!is.null(args$.export))
+        args$.export = c(args$.export, "fn")
+      else args$.export = "fn"
+      if (is.null(args$.errorhandling))
+        args$.errorhandling = c("stop", "remove", "pass")
+      if (is.null(args$.verbose))
+        args$.verbose = FALSE
+      if (is.null(args$.inorder))
+        args$.inorder = TRUE
+      if (is.null(args$.multicombine))
+        args$.multicombine = FALSE
+      foreach::"%dopar%"(do.call(foreach::foreach, args),
+                         apply(i, 1, fn, ...))
+    }
+  }
+  else if (ctrl$parallelType == 1) {
+
+    if (!is.na(ctrl$limitCores)) {
+
+      if (ctrl$limitCores<1) useCores <- round(parallel::detectCores()*ctrl$limitCores) else useCores <- ctrl$limitCores
+
+      cl <- parallel::makeCluster(parallel::detectCores())
+
+    } else {
+
+      cl <- parallel::makeCluster(parallel::detectCores())
+
+    }
+    packFn <- function(packages) {
+      for (i in packages) library(i, character.only = TRUE)
+    }
+    parallel::clusterCall(cl, packFn, ctrl$packages)
+    parallel::clusterExport(cl, ctrl$parVar)
+    fnPop <- function(params, ...) {
+      parallel::parApply(cl = cl, params, 1, fn, ...)
+    }
+  }
+  else {
+    fnPop <- function(params, ...) {
+      apply(params, 1, fn, ...)
+    }
+  }
+  if (is.null(fnMap)) {
+    fnMapC <- function(params, ...) params
+  }
+  else {
+    fnMapC <- function(params, ...) {
+      mappedPop <- t(apply(params, 1, fnMap))
+      if (all(dim(mappedPop) != dim(params)))
+        stop("mapping function did not return an object with ",
+             "dim NP x length(upper).")
+      dups <- duplicated(mappedPop)
+      np <- NCOL(mappedPop)
+      tries <- 0
+      while (tries < 5 && any(dups)) {
+        nd <- sum(dups)
+        newPop <- matrix(runif(nd * np), ncol = np)
+        newPop <- rep(lower, each = nd) + newPop * rep(upper -
+                                                         lower, each = nd)
+        mappedPop[dups, ] <- t(apply(newPop, 1, fnMap))
+        dups <- duplicated(mappedPop)
+        tries <- tries + 1
+      }
+      if (tries == 5)
+        warning("Could not remove ", sum(dups), " duplicates from the mapped ",
+                "population in 5 tries. Evaluating population with duplicates.",
+                call. = FALSE, immediate. = TRUE)
+      storage.mode(mappedPop) <- "double"
+      mappedPop
+    }
+  }
+  outC <- .Call("DEoptimC", lower, upper, fnPop, ctrl, new.env(),
+                fnMapC, PACKAGE = "DEoptim")
+  if (ctrl$parallelType == 1)
+    parallel::stopCluster(cl)
+  if (length(outC$storepop) > 0) {
+    nstorepop <- floor((outC$iter - ctrl$storepopfrom)/ctrl$storepopfreq)
+    storepop <- list()
+    cnt <- 1
+    for (i in 1:nstorepop) {
+      idx <- cnt:((cnt - 1) + (ctrl$NP * ctrl$npar))
+      storepop[[i]] <- matrix(outC$storepop[idx], nrow = ctrl$NP,
+                              ncol = ctrl$npar, byrow = TRUE)
+      cnt <- cnt + (ctrl$NP * ctrl$npar)
+      dimnames(storepop[[i]]) <- list(1:ctrl$NP, nam)
+    }
+  }
+  else {
+    storepop = NULL
+  }
+  names(outC$bestmem) <- nam
+  iter <- max(1, as.numeric(outC$iter))
+  names(lower) <- names(upper) <- nam
+  bestmemit <- matrix(outC$bestmemit[1:(iter * ctrl$npar)],
+                      nrow = iter, ncol = ctrl$npar, byrow = TRUE)
+  dimnames(bestmemit) <- list(1:iter, nam)
+  storepop <- as.list(storepop)
+  outR <- list(optim = list(bestmem = outC$bestmem, bestval = outC$bestval,
+                            nfeval = outC$nfeval, iter = outC$iter), member = list(lower = lower,
+                                                                                   upper = upper, bestmemit = bestmemit, bestvalit = outC$bestvalit,
+                                                                                   pop = t(outC$pop), storepop = storepop))
+  attr(outR, "class") <- "DEoptim"
+  return(outR)
+}
+
+DEoptim.control <- function (VTR = -Inf, strategy = 2, bs = FALSE, NP = NA, itermax = 200,
+                             CR = 0.5, F = 0.8, trace = TRUE, initialpop = NULL, storepopfrom = itermax +
+                               1, storepopfreq = 1, p = 0.2, c = 0, reltol, steptol,
+                             parallelType = 0, limitCores=NA, packages = c(), parVar = c(), foreachArgs = list())
+{
+  if (itermax <= 0) {
+    warning("'itermax' <= 0; set to default value 200\n",
+            immediate. = TRUE)
+    itermax <- 200
+  }
+  if (F < 0 | F > 2) {
+    warning("'F' not in [0,2]; set to default value 0.8\n",
+            immediate. = TRUE)
+    F <- 0.8
+  }
+  if (CR < 0 | CR > 1) {
+    warning("'CR' not in [0,1]; set to default value 0.5\n",
+            immediate. = TRUE)
+    CR <- 0.5
+  }
+  if (strategy < 1 | strategy > 6) {
+    warning("'strategy' not in {1,...,6}; set to default value 2\n",
+            immediate. = TRUE)
+    strategy <- 2
+  }
+  bs <- (bs > 0)
+  if (trace < 0) {
+    warning("'trace' cannot be negative; set to 'TRUE'")
+    trace <- TRUE
+  }
+  storepopfreq <- floor(storepopfreq)
+  if (storepopfreq > itermax)
+    storepopfreq <- 1
+  if (p <= 0 || p > 1) {
+    warning("'p' not in (0,1]; set to default value 0.2\n",
+            immediate. = TRUE)
+    p <- 0.2
+  }
+  if (c < 0 || c > 1) {
+    warning("'c' not in [0,1]; set to default value 0\n",
+            immediate. = TRUE)
+    c <- 0
+  }
+  if (missing(reltol)) {
+    reltol <- sqrt(.Machine$double.eps)
+  }
+  if (missing(steptol)) {
+    steptol <- itermax
+  }
+  if (!(is.null(initialpop))) {
+    if (is.na(NP))
+      if (is.matrix(initialpop))
+        NP <- dim(initialpop)[1]
+      else stop("initialpop must be a matrix")
+      else if (NP != dim(initialpop)[1]) {
+        warning("Resetting NP to the number of rows in initialpop")
+        NP <- dim(initialpop)[1]
+      }
+  }
+  list(VTR = VTR, strategy = strategy, NP = NP, itermax = itermax,
+       CR = CR, F = F, bs = bs, trace = trace, initialpop = initialpop,
+       storepopfrom = storepopfrom, storepopfreq = storepopfreq,
+       p = p, c = c, reltol = reltol, steptol = steptol, parallelType = parallelType, limitCores=limitCores,
+       packages = packages, parVar = parVar, foreachArgs = foreachArgs)
+}

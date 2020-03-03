@@ -11,9 +11,9 @@ library(mclust)
 library(DataExplorer)
 library(data.table)
 
+#draws PCA Figure 5 and S5
 
-
-d_104 = read.table("C:/Users/User/Documents/Polio_data_104/estimate_iterations/104_Up2/Final_ABC_save_parameters_labs_new3.txt",header=TRUE)
+d_104 = read.table("data/104/Final_ABC_save_parameters.txt",header=TRUE)
 #nice labels
 n<-c(expression('log c'[tran]),expression('log c'[com]),expression('log c'[circ]),expression('log c'[rep~pos]),
      expression('log c'[rep~neg]),expression('log c'[pack]),expression('log com'[max]),expression('log rep'[max]),expression('log c'["3A"]),expression('c'[stay]))
@@ -33,7 +33,7 @@ theme_dviz_vgrid <- function(font_size = 14, font_family = dviz_font_family, lin
                              rel_small = 12/14, rel_tiny = 11/14, rel_large = 16/14,
                              colour = "grey90") {
   half_line <- font_size / 2
-  
+
   cowplot::theme_minimal_vgrid(font_size = font_size, font_family = font_family, line_size = line_size,
                                rel_small = rel_small, rel_tiny = rel_tiny, rel_large = rel_large,
                                colour = colour)  %+replace%
@@ -61,7 +61,7 @@ my_plot_prcomp <- function(data, variance_cap = 0.8, maxcat = 50L, prcomp_args =
       if (grepl("missing", e$message)) stop("\nConsider passing `na.omit(data)` as input.")
     }
   )
-  
+
   ## Calcualte principle components standard deviation
   var_exp <- pca$sdev ^ 2
   pc_var <- data.table(
@@ -91,10 +91,10 @@ my_plot_prcomp <- function(data, variance_cap = 0.8, maxcat = 50L, prcomp_args =
       panel.grid.major.x = element_line(colour="gray"),
       axis.ticks.x=element_line(colour="gray")
     )
-  
+
   return(varexp_plot)
-  
-}  
+
+}
 
 my_plot_prcomp_features <- function(data, variance_cap = 0.8, maxcat = 50L, prcomp_args = list("scale." = TRUE), title = NULL, nrow = 3L, ncol = 3L, parallel = FALSE,PC=1) {
   ## Declare variable first to pass R CMD check
@@ -112,7 +112,7 @@ my_plot_prcomp_features <- function(data, variance_cap = 0.8, maxcat = 50L, prco
       if (grepl("missing", e$message)) stop("\nConsider passing `na.omit(data)` as input.")
     }
   )
-  
+
   ## Calcualte principle components standard deviation
   var_exp <- pca$sdev ^ 2
   pc_var <- data.table(
@@ -140,13 +140,13 @@ my_plot_prcomp_features <- function(data, variance_cap = 0.8, maxcat = 50L, prco
   print(d)
   d$lab<-as.list(n)
   print(d)
- 
+
   d<- d[order(d$value),]
   d$Feature <- factor(d$Feature, levels = d$Feature)
   d$lab <- factor(d$lab, levels = d$lab)
-  
+
    p1<-ggplot(d, aes(x = Feature, y = value))+
-    geom_col(fill = "#999999", alpha = 0.9) + 
+    geom_col(fill = "#999999", alpha = 0.9) +
         coord_flip() +
         scale_y_continuous(name = "relative importance",limits =c(-.8,.8), labels=function(l) parse(text=l))+
         scale_x_discrete(name = "feature", labels=parse(text=levels(d$lab)))+
@@ -159,10 +159,10 @@ my_plot_prcomp_features <- function(data, variance_cap = 0.8, maxcat = 50L, prco
     panel.grid.major.x = element_line(colour="gray"),
     axis.ticks.x=element_line(colour="gray")
   )
-  
 
-  
-  
+
+
+
 
   return(p1)
 }
@@ -198,5 +198,5 @@ ppp<-plot_grid(p,labels=c("A"),align='vh',nrow=1,hjust=-1)
 pppp<-plot_grid(ppp,pp,nrow=2,align='vh',hjust=-1,rel_heights = c(.5,1))
 pppp
 
-ggplot2::ggsave("C:/Users/User/Documents/Polio_data_104/pca.pdf",plot=pppp,width = 12, height = 12,units = "in")
+ggplot2::ggsave("pca.pdf",plot=pppp,width = 12, height = 12,units = "in")
 
